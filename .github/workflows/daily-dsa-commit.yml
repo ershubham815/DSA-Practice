@@ -1,0 +1,57 @@
+name: Daily DSA Commit
+
+on:
+  schedule:
+    - cron: '15 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  commit-daily-log:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update daily log
+        id: update
+        env:
+          END_DATE: '2026-10-19'
+        run: |
+          set -euo pipefail
+
+          today="$(date -u +%F)"
+          if [[ "$today" > "$END_DATE" ]]; then
+            echo "active=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          mkdir -p progress
+          touch progress/daily-log.md
+
+          if ! grep -q "^| ${today} |" progress/daily-log.md; then
+            if ! grep -q '^| Date |' progress/daily-log.md; then
+              {
+                echo '| Date | Topic | Problem(s) | Notes |'
+                echo '|---|---|---|---|'
+              } >> progress/daily-log.md
+            fi
+
+            echo "| ${today} | TBD | TBD | Added by automation; replace after solving problems. |" >> progress/daily-log.md
+            echo "active=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "active=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push
+        if: steps.update.outputs.active == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add progress/daily-log.md
+          git commit -m "chore: add daily DSA log entry for $(date -u +%F)"
+          git push
